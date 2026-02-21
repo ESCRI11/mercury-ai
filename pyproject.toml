@@ -16,6 +16,9 @@ dependencies = [
 mercury-cli = "mercury_agent.cli_main:main"
 mercury-web = "mercury_agent.web_main:main"
 
+[tool.hatch.build.targets.wheel]
+packages = ["mercury_agent"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
