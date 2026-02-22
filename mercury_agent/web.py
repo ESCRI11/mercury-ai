@@ -21,6 +21,73 @@ from .tools import TOOL_DEFINITIONS, ToolDispatcher
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
+HELP_TEXT = """\
+/play      Resume current piece after silence
+/silence   Stop all sound
+/model X   Switch to model X
+/models    List available models
+/status    Show current status
+/clear     Clear conversation history
+/help      Show this help"""
+
+
+def _handle_command(
+    text: str,
+    llm: Any,
+    mercury: MercuryClient,
+    state: PieceState,
+    cfg: Config,
+    use_tools: bool,
+) -> str | None:
+    """Handle slash commands. Returns response text, or None if not a command."""
+    parts = text.strip().split(None, 1)
+    verb = parts[0].lower()
+    arg = parts[1].strip() if len(parts) > 1 else ""
+
+    if verb == "/help":
+        return HELP_TEXT
+
+    if verb == "/play":
+        code = state.read()
+        if code:
+            mercury.send_code(code)
+            return f"Playing ({len(code.splitlines())} lines)."
+        return "No piece to play."
+
+    if verb == "/silence":
+        mercury.silence()
+        return "Silenced."
+
+    if verb == "/model":
+        if not arg:
+            return f"Current model: {llm.model}"
+        llm.set_model(arg)
+        return f"Switched to {llm.model}."
+
+    if verb == "/models":
+        names = llm.list_models()
+        current = llm.model
+        lines = [f"{'> ' if n == current else '  '}{n}" for n in names]
+        return "\n".join(lines) if lines else "No models found."
+
+    if verb == "/status":
+        piece = state.read()
+        lines = [
+            f"provider: {cfg.provider}",
+            f"model: {llm.model}",
+            f"tools: {'yes' if use_tools else 'no'}",
+            f"mercury: {'ok' if mercury.health_check() else 'unreachable'}",
+            f"piece: {len(piece.splitlines())} lines" if piece else "piece: none",
+            f"history: {len(llm.history)} messages",
+        ]
+        return "\n".join(lines)
+
+    if verb == "/clear":
+        llm.clear_history()
+        return "History cleared."
+
+    return None
+
 
 def create_app(cfg: Config) -> FastAPI:
     app = FastAPI(title="Mercury AI")
@@ -142,6 +209,7 @@ def create_app(cfg: Config) -> FastAPI:
 
     @app.websocket("/ws")
     async def websocket_chat(ws: WebSocket):
+        nonlocal use_tools
         await ws.accept()
         try:
             while True:
@@ -151,6 +219,15 @@ def create_app(cfg: Config) -> FastAPI:
                 if not user_text:
                     await ws.send_json({"error": "missing message"})
                     continue
+
+                if user_text.startswith("/"):
+                    result = _handle_command(user_text, llm, mercury, state, cfg, use_tools)
+                    if result is not None:
+                        if user_text.strip().split(None, 1)[0].lower() == "/model" and len(user_text.strip().split(None, 1)) > 1:
+                            use_tools = llm.supports_tools()
+                        await ws.send_json({"type": "token", "content": result})
+                        await ws.send_json({"type": "done", "code": None, "tool_results": [], "metrics": None})
+                        continue
 
                 try:
                     messages = _build_messages(llm, state, mercury, system_prompt, user_text)
