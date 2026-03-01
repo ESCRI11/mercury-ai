@@ -162,7 +162,7 @@ list chord [ [0 4 7] [2 5 9] [4 7 11] ]
 ### Algorithmic List Generators
 
 ```
-spread(size low high)              // evenly spaced integers
+spread(size low high)              // evenly spaced integers fractions not allowed!!!
 spreadFloat(size low high)         // evenly spaced floats
 spreadInclusive(size low high)     // includes the high value
 random(size low high)              // random integers
