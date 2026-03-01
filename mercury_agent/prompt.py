@@ -113,13 +113,14 @@ def build_system_prompt(cfg: Config) -> str:
     # Reserve ~25% of context for conversation history
     skill_budget = int(budget_chars * 0.75) - len(ORCHESTRATOR_PREAMBLE)
 
-    for skill_path in [cfg.compose_skill, cfg.kokoro_skill]:
+    skill_paths = [cfg.compose_skill, cfg.kokoro_skill, cfg.hydra_skill, cfg.hydra_reference_skill]
+    per_skill_budget = skill_budget // len(skill_paths)
+    for skill_path in skill_paths:
         if skill_path.exists():
             raw = skill_path.read_text(encoding="utf-8")
             # Strip YAML front-matter
             raw = re.sub(r"^---\n.*?---\n", "", raw, count=1, flags=re.DOTALL)
-            half_budget = skill_budget // 2
-            trimmed = _trim_skill(raw, half_budget)
+            trimmed = _trim_skill(raw, per_skill_budget)
             parts.append(trimmed.strip())
         else:
             parts.append(f"(Skill file not found: {skill_path})")

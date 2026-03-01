@@ -78,6 +78,14 @@ class Config:
     def kokoro_skill(self) -> Path:
         return self._repo_root / "skills" / "mercury-kokoro.md"
 
+    @property
+    def hydra_skill(self) -> Path:
+        return self._repo_root / "skills" / "mercury-hydra.md"
+
+    @property
+    def hydra_reference_skill(self) -> Path:
+        return self._repo_root / "skills" / "hydra-reference.md"
+
 
 def load_config(**overrides) -> Config:
     """Create a Config, optionally overriding fields."""
